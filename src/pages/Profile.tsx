@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { apiClient } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -21,65 +21,48 @@ const Profile = () => {
   }, []);
 
   const fetchProfileData = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    
-    if (!session) {
+    try {
+      const { user } = await apiClient.getSession();
+      
+      if (!user) {
+        navigate("/auth");
+        return;
+      }
+
+      const profileData = await apiClient.getProfile();
+      const certsData = await apiClient.getCertifications();
+
+      setProfile(profileData);
+      setCertifications(certsData);
+      // Note: achievements endpoint not implemented in API yet
+      setAchievements([]);
+      setLoading(false);
+    } catch (error) {
+      console.error("Error fetching profile data:", error);
       navigate("/auth");
-      return;
     }
-
-    const { data: profileData } = await supabase
-      .from("profiles")
-      .select("*, certifications(*)")
-      .eq("id", session.user.id)
-      .single();
-
-    const { data: certsData } = await supabase
-      .from("certifications")
-      .select("*")
-      .order("name");
-
-    const { data: achievementsData } = await supabase
-      .from("achievements")
-      .select("*")
-      .eq("user_id", session.user.id)
-      .order("earned_at", { ascending: false });
-
-    setProfile(profileData);
-    setCertifications(certsData || []);
-    setAchievements(achievementsData || []);
-    setLoading(false);
   };
 
   const handleCertificationChange = async (certificationId: string) => {
-    const { error } = await supabase
-      .from("profiles")
-      .update({ selected_certification_id: certificationId })
-      .eq("id", profile.id);
+    try {
+      await apiClient.updateProfile({
+        selected_certification_id: certificationId,
+      });
 
-    if (error) {
+      toast({
+        title: "Success",
+        description: "Certification updated successfully",
+      });
+
+      fetchProfileData();
+    } catch (error) {
+      console.error("Error updating certification:", error);
       toast({
         variant: "destructive",
         title: "Error",
         description: "Failed to update certification",
       });
-      return;
     }
-
-    // Create progress record if doesn't exist
-    await supabase
-      .from("user_progress")
-      .upsert({
-        user_id: profile.id,
-        certification_id: certificationId,
-      });
-
-    toast({
-      title: "Success",
-      description: "Certification updated successfully",
-    });
-
-    fetchProfileData();
   };
 
   if (loading) {

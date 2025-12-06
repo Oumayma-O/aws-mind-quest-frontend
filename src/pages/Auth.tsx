@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { supabase } from "@/integrations/supabase/client";
+import { apiClient } from "@/services/api";
 import { useToast } from "@/hooks/use-toast";
 import { Cloud } from "lucide-react";
 
@@ -22,20 +22,28 @@ const Auth = () => {
 
   useEffect(() => {
     // Check if user is already logged in
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
+    apiClient.getSession().then(({ user }) => {
+      if (user) {
         navigate("/dashboard");
       }
     });
 
     // Fetch certifications
     const fetchCertifications = async () => {
-      const { data, error } = await supabase
-        .from("certifications")
-        .select("*")
-        .order("name");
-      
-      if (data) setCertifications(data);
+      try {
+        const data = await apiClient.getCertifications();
+        setCertifications(data);
+      } catch (error) {
+        console.error("Error fetching certifications:", error);
+        // Use mock data if API fails (for development)
+        const mockCertifications = [
+          { id: "aws-sa-associate", name: "AWS Solutions Architect Associate", description: "Learn AWS architecture basics", level: "associate" },
+          { id: "aws-dev-associate", name: "AWS Developer Associate", description: "Learn AWS development patterns", level: "associate" },
+          { id: "aws-sysops-associate", name: "AWS SysOps Administrator Associate", description: "Learn AWS operations", level: "associate" },
+          { id: "aws-sa-professional", name: "AWS Solutions Architect Professional", description: "Advanced AWS architecture", level: "professional" },
+        ];
+        setCertifications(mockCertifications);
+      }
     };
 
     fetchCertifications();
@@ -43,58 +51,85 @@ const Auth = () => {
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate all required fields for signup
+    if (isSignUp) {
+      if (!email.trim()) {
+        toast({
+          variant: "destructive",
+          title: "Validation Error",
+          description: "Email is required",
+        });
+        return;
+      }
+      if (!password.trim()) {
+        toast({
+          variant: "destructive",
+          title: "Validation Error",
+          description: "Password is required",
+        });
+        return;
+      }
+      if (!username.trim()) {
+        toast({
+          variant: "destructive",
+          title: "Validation Error",
+          description: "Username is required",
+        });
+        return;
+      }
+      if (!selectedCertification) {
+        toast({
+          variant: "destructive",
+          title: "Validation Error",
+          description: "Please select a certification",
+        });
+        return;
+      }
+    } else {
+      // Validate required fields for signin
+      if (!email.trim()) {
+        toast({
+          variant: "destructive",
+          title: "Validation Error",
+          description: "Email is required",
+        });
+        return;
+      }
+      if (!password.trim()) {
+        toast({
+          variant: "destructive",
+          title: "Validation Error",
+          description: "Password is required",
+        });
+        return;
+      }
+    }
+    
     setLoading(true);
 
     try {
       if (isSignUp) {
         // Sign up
-        const { data: authData, error: signUpError } = await supabase.auth.signUp({
+        await apiClient.signUp({
           email,
           password,
-          options: {
-            emailRedirectTo: `${window.location.origin}/dashboard`,
-          },
+          username,
+          selected_certification_id: selectedCertification,
         });
 
-        if (signUpError) throw signUpError;
+        toast({
+          title: "Success!",
+          description: "Account created successfully. Redirecting...",
+        });
 
-        if (authData.user) {
-          // Create profile
-          const { error: profileError } = await supabase
-            .from("profiles")
-            .insert({
-              id: authData.user.id,
-              username,
-              selected_certification_id: selectedCertification,
-            });
-
-          if (profileError) throw profileError;
-
-          // Create initial progress record
-          const { error: progressError } = await supabase
-            .from("user_progress")
-            .insert({
-              user_id: authData.user.id,
-              certification_id: selectedCertification,
-            });
-
-          if (progressError) throw progressError;
-
-          toast({
-            title: "Success!",
-            description: "Account created successfully. Redirecting...",
-          });
-
-          navigate("/dashboard");
-        }
+        navigate("/dashboard");
       } else {
         // Sign in
-        const { error: signInError } = await supabase.auth.signInWithPassword({
+        await apiClient.signIn({
           email,
           password,
         });
-
-        if (signInError) throw signInError;
 
         toast({
           title: "Welcome back!",
@@ -149,13 +184,22 @@ const Auth = () => {
                       <SelectValue placeholder="Select certification" />
                     </SelectTrigger>
                     <SelectContent>
-                      {certifications.map((cert) => (
-                        <SelectItem key={cert.id} value={cert.id}>
-                          {cert.name}
-                        </SelectItem>
-                      ))}
+                      {certifications.length === 0 ? (
+                        <div className="p-2 text-sm text-muted-foreground">Loading certifications...</div>
+                      ) : (
+                        certifications.map((cert) => (
+                          <SelectItem key={cert.id} value={cert.id}>
+                            {cert.name}
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
+                  {certifications.length > 0 && certifications[0].description && (
+                    <p className="text-xs text-muted-foreground">
+                      {certifications.find(c => c.id === selectedCertification)?.description}
+                    </p>
+                  )}
                 </div>
               </>
             )}

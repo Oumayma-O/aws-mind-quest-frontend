@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { apiClient } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -12,6 +12,7 @@ const Dashboard = () => {
   const [profile, setProfile] = useState<any>(null);
   const [progress, setProgress] = useState<any>(null);
   const [recentQuizzes, setRecentQuizzes] = useState<any[]>([]);
+  const [certification, setCertification] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -21,42 +22,63 @@ const Dashboard = () => {
   }, []);
 
   const fetchDashboardData = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    
-    if (!session) {
+    try {
+      const { user } = await apiClient.getSession();
+      
+      if (!user) {
+        navigate("/auth");
+        return;
+      }
+
+      const profileData = await apiClient.getProfile();
+      
+      // Try to get progress, handle 404 for new users (cold start)
+      let progressData = null;
+      try {
+        progressData = await apiClient.getDashboardProgress();
+      } catch (progressError: any) {
+        // If 404, it's a new user with no progress yet - this is normal
+        if (progressError?.status === 404) {
+          console.log("No progress found - new user, showing empty state");
+          progressData = null;
+        } else {
+          // Re-throw other errors
+          throw progressError;
+        }
+      }
+      
+      // Get quizzes only if certification is selected
+      const quizzesData = profileData.selected_certification_id
+        ? await apiClient.getUserQuizzes(profileData.selected_certification_id, 5)
+        : [];
+      
+      // Get certification details if selected
+      let certificationData = null;
+      if (profileData.selected_certification_id) {
+        try {
+          certificationData = await apiClient.getCertificationById(profileData.selected_certification_id);
+        } catch (error) {
+          console.log("Could not fetch certification details");
+        }
+      }
+
+      setProfile(profileData);
+      setProgress(progressData);
+      setRecentQuizzes(quizzesData);
+      setCertification(certificationData);
+      setLoading(false);
+    } catch (error) {
+      console.error("Error fetching dashboard data:", error);
       navigate("/auth");
-      return;
     }
-
-    const { data: profileData } = await supabase
-      .from("profiles")
-      .select("*, certifications(*)")
-      .eq("id", session.user.id)
-      .single();
-
-    const { data: progressData } = await supabase
-      .from("user_progress")
-      .select("*")
-      .eq("user_id", session.user.id)
-      .eq("certification_id", profileData?.selected_certification_id)
-      .single();
-
-    const { data: quizzesData } = await supabase
-      .from("quizzes")
-      .select("*")
-      .eq("user_id", session.user.id)
-      .order("created_at", { ascending: false })
-      .limit(5);
-
-    setProfile(profileData);
-    setProgress(progressData);
-    setRecentQuizzes(quizzesData || []);
-    setLoading(false);
   };
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    navigate("/");
+    try {
+      await apiClient.signOut();
+    } finally {
+      navigate("/");
+    }
   };
 
   const startQuiz = () => {
@@ -113,7 +135,9 @@ const Dashboard = () => {
               <Target className="h-4 w-4 text-secondary" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{progress?.accuracy?.toFixed(1) || 0}%</div>
+              <div className="text-2xl font-bold">
+                {progress?.average_accuracy ? progress.average_accuracy.toFixed(1) : '0'}%
+              </div>
               <p className="text-xs text-muted-foreground mt-2">
                 {progress?.correct_answers || 0}/{progress?.total_questions_answered || 0} correct
               </p>
@@ -152,25 +176,36 @@ const Dashboard = () => {
             <Card className="border-primary/20">
               <CardHeader>
                 <CardTitle>Current Certification</CardTitle>
-                <CardDescription>{profile?.certifications?.description}</CardDescription>
+                <CardDescription>
+                  {certification?.description || "Select a certification to get started"}
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-2xl font-bold text-primary">{profile?.certifications?.name}</h3>
-                    <Badge variant="outline" className="mt-2">
-                      {progress?.current_difficulty?.toUpperCase() || "EASY"} Difficulty
-                    </Badge>
+                {certification ? (
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-2xl font-bold text-primary">{certification.name}</h3>
+                      <Badge variant="outline" className="mt-2">
+                        {progress?.current_difficulty?.toUpperCase() || "EASY"} Difficulty
+                      </Badge>
+                    </div>
+                    <Button 
+                      size="lg" 
+                      onClick={startQuiz}
+                      className="bg-primary hover:bg-primary/90"
+                    >
+                      <Zap className="w-4 h-4 mr-2" />
+                      Start Quiz
+                    </Button>
                   </div>
-                  <Button 
-                    size="lg" 
-                    onClick={startQuiz}
-                    className="bg-primary hover:bg-primary/90"
-                  >
-                    <Zap className="w-4 h-4 mr-2" />
-                    Start Quiz
-                  </Button>
-                </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <p className="text-muted-foreground mb-4">No certification selected</p>
+                    <Button onClick={() => navigate("/profile")}>
+                      Select Certification
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
 

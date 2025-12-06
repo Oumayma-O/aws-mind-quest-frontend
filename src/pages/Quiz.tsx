@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { apiClient } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -27,53 +27,80 @@ const Quiz = () => {
   }, []);
 
   const generateQuiz = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    
-    if (!session) {
-      navigate("/auth");
-      return;
-    }
+    try {
+      const { user } = await apiClient.getSession();
+      
+      if (!user) {
+        navigate("/auth");
+        return;
+      }
 
-    // Fetch profile and progress
-    const { data: profileData } = await supabase
-      .from("profiles")
-      .select("*, certifications(*)")
-      .eq("id", session.user.id)
-      .single();
+      const profileData = await apiClient.getProfile();
+      
+      // Validate certification ID exists
+      if (!profileData.selected_certification_id) {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Please select a certification in your profile first.",
+        });
+        navigate("/profile");
+        return;
+      }
 
-    const { data: progressData } = await supabase
-      .from("user_progress")
-      .select("*")
-      .eq("user_id", session.user.id)
-      .eq("certification_id", profileData?.selected_certification_id)
-      .maybeSingle();
+      // Try to get progress, but handle 404 for new users (cold start)
+      let progressData = null;
+      try {
+        progressData = await apiClient.getCertificationProgress(
+          profileData.selected_certification_id
+        );
+      } catch (progressError: any) {
+        // If 404, it's a new user with no progress yet - this is normal
+        if (progressError?.status === 404) {
+          console.log("No progress found - new user, starting fresh");
+          progressData = null;
+        } else {
+          // Re-throw other errors
+          throw progressError;
+        }
+      }
 
-    setProfile(profileData);
-    setProgress(progressData);
+      setProfile(profileData);
+      setProgress(progressData);
 
-    // Call edge function to generate quiz
-    const { data: quizData, error } = await supabase.functions.invoke("generate-quiz", {
-      body: {
-        userId: session.user.id,
-        certificationId: profileData?.selected_certification_id,
-        difficulty: progressData?.current_difficulty || "easy",
-        weakDomains: progressData?.weak_domains || [],
-      },
-    });
+      // Call API to generate quiz
+      console.log("Generating quiz for certification:", profileData.selected_certification_id);
+      const quizData = await apiClient.generateQuiz(
+        profileData.selected_certification_id,
+        "medium"
+      );
+      
+      console.log("Quiz API response:", quizData);
+      
+      // Backend returns: { quiz_id, certification_id, difficulty, total_questions, questions }
+      // We need to create a quiz object with the id
+      const quizObject = {
+        id: quizData.quiz_id,
+        certification_id: quizData.certification_id,
+        difficulty: quizData.difficulty,
+        total_questions: quizData.total_questions
+      };
+      
+      console.log("Quiz object:", quizObject);
+      console.log("Questions:", quizData.questions);
 
-    if (error) {
+      setQuiz(quizObject);
+      setQuestions(quizData.questions);
+      setLoading(false);
+    } catch (error) {
+      console.error("Error generating quiz:", error);
       toast({
         variant: "destructive",
         title: "Error",
         description: "Failed to generate quiz. Please try again.",
       });
       navigate("/dashboard");
-      return;
     }
-
-    setQuiz(quizData.quiz);
-    setQuestions(quizData.questions);
-    setLoading(false);
   };
 
   const handleAnswerChange = (questionId: string, answer: any) => {
@@ -86,25 +113,37 @@ const Quiz = () => {
   const handleSubmit = async () => {
     setSubmitting(true);
 
-    // Call edge function to evaluate answers
-    const { data, error } = await supabase.functions.invoke("evaluate-quiz", {
-      body: {
-        quizId: quiz.id,
-        answers,
-      },
-    });
-
-    if (error) {
+    try {
+      console.log("=== Quiz Submission ===");
+      console.log("Quiz object:", quiz);
+      console.log("Quiz ID:", quiz?.id);
+      console.log("Answers:", answers);
+      console.log("Number of questions:", questions.length);
+      console.log("Number of answers:", Object.keys(answers).length);
+      
+      if (!quiz || !quiz.id) {
+        throw new Error("Quiz not loaded properly. Please refresh and try again.");
+      }
+      
+      // Call API to evaluate quiz
+      const result = await apiClient.evaluateQuiz(quiz.id, answers);
+      console.log("Quiz evaluation result:", result);
+      
+      navigate(`/results/${quiz.id}`);
+    } catch (error: any) {
+      console.error("=== Error submitting quiz ===");
+      console.error("Error object:", error);
+      console.error("Error status:", error?.status);
+      console.error("Error message:", error?.message);
+      console.error("Error data:", error?.data);
+      
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to submit quiz. Please try again.",
+        description: error?.data?.detail || error?.message || "Failed to submit quiz. Please try again.",
       });
       setSubmitting(false);
-      return;
     }
-
-    navigate(`/results/${quiz.id}`);
   };
 
   if (loading) {
@@ -150,9 +189,6 @@ const Quiz = () => {
             </div>
             <CardDescription>
               {currentQuestion.question_type === "multi_select" && "Select all that apply"}
-              {currentQuestion.domain && (
-                <span className="ml-2 text-primary">• {currentQuestion.domain}</span>
-              )}
             </CardDescription>
           </CardHeader>
 
@@ -163,12 +199,16 @@ const Quiz = () => {
                 onValueChange={(value) => handleAnswerChange(currentQuestion.id, value)}
               >
                 {currentQuestion.options.map((option: string, index: number) => (
-                  <div key={index} className="flex items-center space-x-2 p-4 rounded-lg border border-border hover:border-primary/50 transition-colors">
+                  <Label
+                    key={index}
+                    htmlFor={`option-${index}`}
+                    className="flex items-center space-x-2 p-4 rounded-lg border border-border hover:border-primary/50 transition-colors cursor-pointer"
+                  >
                     <RadioGroupItem value={option} id={`option-${index}`} />
-                    <Label htmlFor={`option-${index}`} className="flex-1 cursor-pointer">
+                    <span className="flex-1">
                       {option}
-                    </Label>
-                  </div>
+                    </span>
+                  </Label>
                 ))}
               </RadioGroup>
             )}
@@ -176,7 +216,11 @@ const Quiz = () => {
             {currentQuestion.question_type === "multi_select" && (
               <div className="space-y-2">
                 {currentQuestion.options.map((option: string, index: number) => (
-                  <div key={index} className="flex items-center space-x-2 p-4 rounded-lg border border-border hover:border-primary/50 transition-colors">
+                  <Label
+                    key={index}
+                    htmlFor={`option-${index}`}
+                    className="flex items-center space-x-2 p-4 rounded-lg border border-border hover:border-primary/50 transition-colors cursor-pointer"
+                  >
                     <Checkbox
                       id={`option-${index}`}
                       checked={answers[currentQuestion.id]?.includes(option) || false}
@@ -189,10 +233,10 @@ const Quiz = () => {
                         }
                       }}
                     />
-                    <Label htmlFor={`option-${index}`} className="flex-1 cursor-pointer">
+                    <span className="flex-1">
                       {option}
-                    </Label>
-                  </div>
+                    </span>
+                  </Label>
                 ))}
               </div>
             )}

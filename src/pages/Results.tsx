@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { apiClient } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -19,29 +19,24 @@ const Results = () => {
   }, [quizId]);
 
   const fetchResults = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    
-    if (!session) {
-      navigate("/auth");
-      return;
+    try {
+      const { user } = await apiClient.getSession();
+      
+      if (!user) {
+        navigate("/auth");
+        return;
+      }
+
+      const quizData = await apiClient.getQuiz(quizId!);
+
+      setQuiz(quizData);
+      // Questions should be included in quizData
+      setQuestions(quizData.questions || []);
+      setLoading(false);
+    } catch (error) {
+      console.error("Error fetching results:", error);
+      navigate("/dashboard");
     }
-
-    const { data: quizData } = await supabase
-      .from("quizzes")
-      .select("*")
-      .eq("id", quizId)
-      .eq("user_id", session.user.id)
-      .single();
-
-    const { data: questionsData } = await supabase
-      .from("questions")
-      .select("*")
-      .eq("quiz_id", quizId)
-      .order("created_at");
-
-    setQuiz(quizData);
-    setQuestions(questionsData || []);
-    setLoading(false);
   };
 
   if (loading) {
