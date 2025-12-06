@@ -59,10 +59,6 @@ This is the **React frontend** for the AWS Mind Quest project - an intelligent q
 - **Backend**: AWS Mind Quest FastAPI backend running on `http://localhost:8000`
 
 
-## 👥 Authors
-
-- **Oumayma O.** - [GitHub](https://github.com/Oumayma-O)
-
 ## 🔗 Related Repositories
 
 - **Backend**: [AWS Mind Quest Backend](https://github.com/Oumayma-O/aws-mind-quest-backend) - FastAPI backend
