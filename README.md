@@ -1,75 +1,68 @@
-# Welcome to your Lovable project
+# AWS Mind Quest - Frontend
 
-## Project info
+> A modern React-based quiz application for AWS certification preparation with adaptive learning features.
 
-**URL**: https://lovable.dev/projects/9b2fedb3-192e-4fab-9d9f-fc3207df4123
+## 🚀 Overview
 
-## How can I edit this code?
+This is the **React frontend** for the AWS Mind Quest project - an intelligent quiz platform designed to help users prepare for AWS certification exams. The application features adaptive difficulty, personalized weak domain tracking, and comprehensive progress analytics.
 
-There are several ways of editing your application.
+## 📸 Screenshots
 
-**Use Lovable**
+### Landing Page
+![Landing Page](docs/screenshots/landing.png)
+*Clean and modern landing page with call-to-action*
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/9b2fedb3-192e-4fab-9d9f-fc3207df4123) and start prompting.
+### Authentication
 
-Changes made via Lovable will be committed automatically to this repo.
+![Sign Up](docs/screenshots/signup.png)
+*User registration with certification selection*
 
-**Use your preferred IDE**
+### Dashboard
+![Dashboard](docs/screenshots/dashboard.png)
+*Personalized dashboard showing progress, stats, and weak domains*
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### Quiz Interface
+![Quiz Generation](docs/screenshots/quiz_question.png)
+*Quiz generation with difficulty selection and weak domain focus*
+*Interactive quiz interface with clean question display*
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+### Results & Analytics
+![Quiz Results](docs/screenshots/quiz_result.png)
+*Detailed results with performance breakdown*
 
-Follow these steps:
+![Quiz Results](docs/screenshots/answer.png)
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+### User Profile
+![Profile](docs/screenshots/profile.png)
+*User profile management and certification tracking*
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+## 🛠️ Tech Stack
 
-# Step 3: Install the necessary dependencies.
-npm i
+- **Framework**: React 18
+- **Build Tool**: Vite 5.4.19
+- **Language**: TypeScript
+- **UI Library**: Shadcn/UI (Radix UI primitives)
+- **Styling**: Tailwind CSS
+- **State Management**: React Hooks (useState, useEffect)
+- **Routing**: React Router DOM
+- **HTTP Client**: Custom API client with fetch API
+- **Icons**: Lucide React
+- **Notifications**: Sonner (Toast)
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
 
-**Edit a file directly in GitHub**
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
 
-**Use GitHub Codespaces**
+## ⚙️ Prerequisites
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+- **Node.js**: v18.0.0 or higher
+- **npm** or **bun**: Latest version
+- **Backend**: AWS Mind Quest FastAPI backend running on `http://localhost:8000`
 
-## What technologies are used for this project?
 
-This project is built with:
+## 👥 Authors
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+- **Oumayma O.** - [GitHub](https://github.com/Oumayma-O)
 
-## How can I deploy this project?
+## 🔗 Related Repositories
 
-Simply open [Lovable](https://lovable.dev/projects/9b2fedb3-192e-4fab-9d9f-fc3207df4123) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
-# aws-mind-quest-frontend
-# aws-mind-quest-frontend
+- **Backend**: [AWS Mind Quest Backend](https://github.com/Oumayma-O/aws-mind-quest-backend) - FastAPI backend
