@@ -1,0 +1,11 @@
+{
+  "buildCommand": "npm run build",
+  "devCommand": "npm run dev",
+  "installCommand": "npm install",
+  "outputDirectory": "dist",
+  "framework": "vite",
+  "nodeVersion": "18.x",
+  "env": {
+    "VITE_API_URL": "@aws-mind-quest-api-url"
+  }
+}
