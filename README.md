@@ -6,6 +6,8 @@
 
 This is the **React frontend** for the AWS Mind Quest project - an intelligent quiz platform designed to help users prepare for AWS certification exams. The application features adaptive difficulty, personalized weak domain tracking, and comprehensive progress analytics.
 
+https://aws-mind-quest.vercel.app/dashboard
+
 ## 📸 Screenshots
 
 ### Landing Page
